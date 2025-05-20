@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 # Allow overriding executable name
 if(NOT DEFINED APP OR APP STREQUAL "")
-    set(APP "APP")
+    set(APP "GraphServer")
 endif()
 
 
@@ -93,6 +93,8 @@ find_package(jh-toolkit REQUIRED)
 add_executable(${APP}
         main.cpp
         Web/views.cpp
+        Application/GraphManager.hpp
+        Algo/Graph.hpp
 )
 
 # ==== Include & Link ====

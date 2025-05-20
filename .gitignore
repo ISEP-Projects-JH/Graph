@@ -35,6 +35,9 @@
 **/*Build*/
 **/*BUILD*/
 
-
 # dist
 **/*dist*
+
+# built images
+*.tar
+*.tar.gz

@@ -1,6 +1,6 @@
 # === Build-time arguments ===
 ARG COMPILER=clang
-ARG APP=BulgogiAPP
+ARG APP=GraphServer
 ARG PORT=8080
 
 # === Base image ===

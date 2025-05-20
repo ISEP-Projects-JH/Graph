@@ -1,136 +1,126 @@
-<div align="center" style="margin-top: 20px; margin-bottom: -30px;">
-  <img src="https://raw.githubusercontent.com/bulgogi-framework/.github/main/res/img/Bulgogi.svg" alt="bulgogi logo" style="max-width: 100%; max-height: 1024px;">
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/bulgogi-framework/.github/main/res/img/Bulgogi.svg" alt="bulgogi logo" style="max-width: 100%; max-height: 200px;">
 </div>
 
-<h1 align="center">Bulgogi</h1>
+<h1 align="center">Graph Server Project</h1>
 
 <p align="center">
-  <b>A lightweight, web-free C++ HTTP API framework built on Boost.Beast</b>
-</p>
-
-<p align="center">
-  <a href="https://github.com/bulgogi-framework/bulgogi/blob/main/docs/quick_start.md">
-    <img src="https://img.shields.io/badge/Quick%20Start-black?style=for-the-badge&logo=fastapi" alt="Quick Start"/>
-  </a>
+  <b>A high-performance containerized graph computation service in modern C++20, backed by Clang and powered by bulgogi.</b><br/>
+  <em>Includes Python SDK for easy interaction and automation.</em>
 </p>
 
 ---
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-violet.svg)](https://en.cppreference.com/w/cpp/20)
-[![Boost](https://img.shields.io/badge/Boost-1.88-blue.svg)](https://www.boost.org/)
-[![jh-toolkit](https://img.shields.io/badge/jh--toolkit-1.3.x--LTS-brightgreen)](https://github.com/JeongHan-Bae/JH-Toolkit/tree/1.3.x-LTS)
-[![CMake](https://img.shields.io/badge/CMake-3.25%2B-blue)](https://cmake.org/)
-[![Clang](https://img.shields.io/badge/Clang-14.0%2B-yellow)](https://clang.llvm.org/)
-[![Docker](https://img.shields.io/badge/Docker-Buildx-lightgrey)](https://docs.docker.com/buildx/working-with-buildx/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Contributors](https://img.shields.io/github/contributors/bulgogi-framework/bulgogi.svg)](https://github.com/bulgogi-framework/bulgogi/graphs/contributors)
 
---- 
+## 🧠 Features
 
-## 🔥 What is Bulgogi?
-
-**Bulgogi** is a minimal C++ HTTP API framework designed for developers who want full control, fast iteration, and zero bloat.
-
-It provides a macro-based routing system over Boost.Beast, focuses on HTTP-only APIs, and includes no frontend baggage.  
-Ideal for:
-
-- Backend service APIs
-- Internal tools
-- RPC-style servers
-- Embedded or game server endpoints
-- Interop with JS frontends or CLI clients
+- Implemented in **C++20** with **LLVM/Clang** and `-march=native` optimizations
+- Uses a custom **adjacency matrix** for SIMD-friendly memory layout
+- Graph algorithms supported:
+  - Degree, degree statistics
+  - Triangle counting
+  - Shortest paths (BFS & Dijkstra)
+  - Betweenness centrality
+  - Isolated node detection
+- HTTP interface via **[bulgogi](https://github.com/bulgogi-framework/bulgogi)** — a lightweight Boost.Beast wrapper
+- Includes Python SDK with automatic cleanup and alias support
+- Containerized with **Docker** for reproducibility and testing
 
 ---
 
-## ✨ Features
+## 🚀 Quick Start
 
-- ⚡ **One macro = one route**: add endpoints in seconds
-- 🧩 **Web-free by default**: no templating or frontend assumptions
-- 🐚 **Zero runtime complexity**: no coroutines, no frameworks, no abstractions
-- 🐳 **Docker-ready**: development and runtime images supported
-- 💡 **Debug-only root page**: safe for pure APIs
-- 🛠️ Powered by **Boost.Beast** and **jh-toolkit**
+### 1. Build the Docker image
 
----
+```bash
+docker build -t graph-server -f docker/Dockerfile .
+````
 
-## 🧩 Web-Free by Design
+### 2. Run the server
 
-Bulgogi intentionally avoids the web layer:
+```bash
+docker run -p 8080:8080 graph-server
+```
 
-- No HTML renderer, no templating DSL
-- No static file system unless you implement one
-- APIs are consumed via curl, Postman, JS clients, or internal systems
-- Debug root page appears *only* when `NDEBUG` is not defined
+### 3. Use the Python client
 
----
+> Requires Python 3.10+. All Python client files are in the `python/` directory.
 
-## 📁 Project Structure
+```python
+from client import Graph, AliasGraph
 
-```text
-.
-├── CMakeLists.txt            # Root build file
-├── main.cpp                  # Entry point (No need to modify)
-├── Web/
-│   ├── views.cpp             # Define your routes here
-│   ├── views.hpp             # Route Macros (No need to modify)
-│   ├── template.hpp          # Optional embedded HTML registry
-│   └── ...                   # Other predefined functions
-├── Application/              # Your service logic (custom)
-├── Entities/                 # Optional data models (Strongly Recommend applying POD from jh-toolkit)
-├── docker/
-│   ├── Dockerfile
-│   └── Dockerfile.runtime
-├── docs/
-│   ├── quick_start.md        # Installation and setup guide
-│   └── api.md                # Route registration and HTTP usage
-├── NOTICE.md                 # License info for dependencies
-├── build.md                  # Detailed build/deployment options
-└── LICENSE                   # MIT license
+g = Graph(size=100, bi=True, weighed=True)
+g.add_edge(0, 1, weight=3)
+print(g.stats())
+```
+
+### 4. Load graph from text file with aliases
+
+```python
+g = AliasGraph("graph.txt")
+print(g.stats())
+print(g.centrality())
 ```
 
 ---
 
-## 📚 Documentation
+## 📑 API
 
-* 📦 [Quick Start](docs/quick_start.md)
-* 🔧 [Build & Deployment](docs/build.md)
-* 📖 [API Reference](docs/api.md)
-
----
-
-## 🍖 Why "Bulgogi"?
-
-The name **"Bulgogi"** is a tongue-in-cheek reference to its foundation:
-the framework is built on top of **Boost.Beast**, a powerful but low-level C++ HTTP library.
-
-> Instead of fighting raw Beast — Bulgogi serves you the grilled version.
-
-Just like the Joseonjok dish **bulgogi** (불고기), which means "grilled meat",
-this project offers a **lightly wrapped, ready-to-serve experience**:
-
-* No manual Beast session/state handling
-* No deep Asio socket dance
-* No template gymnastics or build-time complexity
-
-Bulgogi is what Beast might feel like **if someone cooked it for you** —
-clean, ready-to-use, and enjoyable, even for quick tasks.
-
-You can still go low-level if you want —
-but for most use cases, this "pre-grilled" framework is all you need.
+The full HTTP API is documented in [`docs/api.md`](docs/api.md).
+All endpoints support JSON input/output and `curl`-friendly queries.
 
 ---
 
-## 📄 License
+## 📦 Dependencies
 
-MIT License © 2025 [bulgogi-framework](https://github.com/bulgogi-framework)  
-Bulgogi is open-sourced under permissive terms and welcomes contribution.
+### Development (C++20 build only)
 
-Created and maintained by [JeongHan-Bae](https://github.com/JeongHan-Bae)
+- C++20 compiler (Clang ≥ 13 preferred)
+- [Boost](https://www.boost.org) 1.80+ with JSON module (Docker uses 1.88.0)
+- [JH-Toolkit](https://github.com/JeongHan-Bae/JH-Toolkit) `1.3.x-LTS`
+- CMake ≥ 3.27 (Docker builds from source)
+- Docker (for consistent build & deployment)
+
+### Runtime (Python client)
+
+- Python 3.10+
+- `requests` library (automatically used by the Python SDK)
 
 ---
 
-## 🤝 Acknowledgements
+## 🛠 Design Highlights
 
-* [Boost.Beast](https://github.com/boostorg/beast) — core HTTP engine  
-* [jh-toolkit](https://github.com/JeongHan-Bae/jh-toolkit) — type-safe and pod utilities
+* SIMD-friendly layout: adjacency matrix avoids pointer chains
+* `ColIter` enables efficient column traversal for triangle & centrality calc
+* `GraphManager` supports graph ID registration and locking
+* Python-side cleanup uses `atexit` + `__del__` to reduce memory leaks
 
-See [NOTICE.md](./NOTICE.md) for third-party license disclosures.
+---
+
+## 📂 Folder Structure
+
+```
+.
+├── docker/           # Dockerfile and build config
+├── Application/      # C++ GraphManager and core logic
+├── Algo/             # C++ Graph algorithms
+├── Web/              # bulgogi-based HTTP server
+├── python/           # Python SDK (GraphClient, AliasGraph)
+└── docs/             # API documentation
+```
+
+---
+
+## 📊 Attribution
+
+* Demo graph data sourced from [Stanford SNAP](https://snap.stanford.edu/data/)
+* HTTP framework forked and customized from [bulgogi](https://github.com/bulgogi-framework/bulgogi)
+
+---
+
+## 🧑‍💻 Author
+
+Developed and maintained by **JH / JeongHan-Bae**
+
+* GitHub: [@JeongHan-Bae](https://github.com/JeongHan-Bae)
+* Framework: [bulgogi-framework](https://github.com/bulgogi-framework/bulgogi)

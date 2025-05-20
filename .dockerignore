@@ -55,4 +55,4 @@ docker/
 .gitignore
 .dockerignore
 
-LICENSE
+python/

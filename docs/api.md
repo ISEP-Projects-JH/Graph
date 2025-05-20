@@ -1,405 +1,408 @@
-<p align="right" style="margin-bottom: -30px;">
-  <a href="https://github.com/bulgogi-framework/bulgogi#readme">
-    <img src="https://img.shields.io/badge/Back%20to%20README-black?style=for-the-badge&logo=github" alt="Back to README"/>
-  </a>
-</p>
+# 📘 API Reference: Graph Server
 
-# 📖 API Documentation
-
-## 📌 Table of Contents
-
-- [🧭 Route Definition](#-route-definition)
-- [🧰 `bulgogi` Utilities](#-bulgogi-utilities)
-- [📦 `jh::pod` Introduction](#-jhpod-introduction)
+This document lists all available routes in the Graph HTTP server and demonstrates how to use them via `curl`.
 
 ---
 
-## 🧭 Route Definition
+## 🔍 Metadata
 
-### 🪄 Registering Views
-
-Use macros to declare routes concisely:
-
-```c++
-REGISTER_VIEW(ping) {
-    if (!bulgogi::check_method(req, bulgogi::http::verb::get, res)) return;
-    bulgogi::set_json(res, {{"status", "alive"}});
-}
-```
-
-This binds `/ping` to the handler above.
+* **Graph ID (`id`)** is assigned by the server upon graph creation.
+* **Directionality (`bi`)** and **Weight flag (`weighed`)** are held by the client. The server does **not store** this metadata.
+* Deletion must be handled explicitly by the caller (`/graph/destroy?id=...`); **mass deletion is not allowed** to prevent unintentional interruption.
+* Server will clean up all graphs on shutdown.
+* The `/` page is a minimal REPL-like demo, not suitable for production use. Consider using `Python` or `Node.js` for robust clients.
 
 ---
 
-### 🔁 `REGISTER_VIEW_URLS` — Explicit Route Binding
+## 📍 `/ping`
 
-```c++
-REGISTER_VIEW_URLS(my_handler,
-    "user-info",
-    "user_info",
-    "user/info"
-) {
-    // handler code
-}
+* **Method:** `GET`
+* **Description:** Health check
+
+**Example:**
+
+```bash
+curl -X GET http://localhost:8080/ping
 ```
 
-Use this macro when:
+**Response:**
 
-* ✅ Your URL path contains characters that can't appear in function names (e.g. `-`)
-* ✅ You want **multiple equivalent routes** to point to the same handler
-* ✅ You need a path with **more than 5 segments** (which `REGISTER_VIEW(...)` does not support)
-
-#### Key Differences vs `REGISTER_VIEW(...)`:
-
-| Feature                           | `REGISTER_VIEW(...)` | `REGISTER_VIEW_URLS(...)` |
-|-----------------------------------|----------------------|---------------------------|
-| Function name auto-mapped to path | ✅ Yes                | ❌ Manual only             |
-| Supports `-` in URL path          | ❌ No                 | ✅ Yes                     |
-| Supports more than 5 segments     | ❌ No (1–5 max)       | ✅ Unlimited               |
-| Multiple equivalent paths         | ❌ One path only      | ✅ Multi-path registration |
-| Easier to read for custom routes  | 🚫 Limited           | ✅ Recommended for aliases |
-
-#### Example: Route with hyphen and slashes
-
-```c++
-REGISTER_VIEW_URLS(get_user_info,
-    "user-info",     // kebab-case alias
-    "user_info",     // snake_case
-    "user/info"      // REST-style
-) {
-    if (!bulgogi::check_method(req, bulgogi::http::verb::get, res)) return;
-    std::string id = bulgogi::get_query_param(req, "id").value_or("unknown");
-    bulgogi::set_json(res, {{"user", id}});
-}
+```json
+{"status": "alive"}
 ```
 
 ---
 
-💡 Tip: You can mix `REGISTER_VIEW(...)` for simple routes and `REGISTER_VIEW_URLS(...)` for special cases.
+## 📍 `/shutdown_server`
 
+* **Method:** `POST`
+* **Description:** Gracefully shuts down the server
 
-### Supported macros:
+**Example:**
 
-| Macro                             | URL Path       | Notes                                |
-|-----------------------------------|----------------|--------------------------------------|
-| `REGISTER_VIEW(ping)`             | `/ping`        | Normal route                         |
-| `REGISTER_ROOT_VIEW(main)`        | `/`            | Root fallback (debug)                |
-| `REGISTER_VIEW(api, user, id)`    | `/api/user/id` | Multi-part route                     |
-| `REGISTER_VIEW_URLS(f, paths...)` | Custom         | Manual control, aliases, `-` support |
-
-Multi-part routes are joined with `/`, and function name becomes `api__user__id`.
-
-### 🧠 When to Use Which Macro?
-
-Use this table to decide which macro to use:
-
-| Use Case                                   | Recommended Macro         |
-|--------------------------------------------|---------------------------|
-| Simple routes, function name matches       | `REGISTER_VIEW(...)`      |
-| Root path `/`                              | `REGISTER_ROOT_VIEW(...)` |
-| URL has `-` or doesn't match function name | `REGISTER_VIEW_URLS(...)` |
-| Multiple equivalent routes                 | `REGISTER_VIEW_URLS(...)` |
-| Deep routes (> 5 segments)                 | `REGISTER_VIEW_URLS(...)` |
-
----
-
-### 🧪 Handler Basics
-
-Each route receives:
-
-```c++
-void my_handler(const bulgogi::Request& req, bulgogi::Response& res);
+```bash
+curl -X POST http://localhost:8080/shutdown_server
 ```
 
-Use utility functions to simplify logic:
+**Response:**
 
-```c++
-if (!bulgogi::check_method(req, http::verb::post, res)) return;
-auto obj = bulgogi::get_json_obj(req);
+```json
+{"status": "server_shutdown_requested"}
 ```
 
 ---
 
-### 🔍 Examples
+## 📍 `/graph/create`
 
-#### GET with query parameter
+* **Method:** `POST`
+* **Body:** `application/json`
 
-```c++
-// GET /greet?name=John
-REGISTER_VIEW(greet) {
-if (!bulgogi::check_method(req, bulgogi::http::verb::get, res)) return;
-std::string name = bulgogi::get_query_param(req, "name").value_or("anonymous");
-bulgogi::set_json(res, {{ "hello", name }});
-}
+```json
+{ "size": 100 }
 ```
 
-#### POST with JSON body
+**Example:**
 
-```c++
-REGISTER_VIEW(echo) {
-    if (!bulgogi::check_method(req, bulgogi::http::verb::post, res)) return;
-    auto obj = bulgogi::get_json_obj(req);
-    bulgogi::set_json(res, {{"you_said", obj["msg"]}});
-}
+```bash
+curl -X POST http://localhost:8080/graph/create \
+  -H "Content-Type: application/json" \
+  -d '{"size":100}'
 ```
 
-> ⚠️ Will throw on invalid JSON — suggest wrap in try-catch or validate `req.body()` first.
+**Response:**
 
-#### HEAD route
-
-```c++
-REGISTER_VIEW(status) {
-    if (!bulgogi::check_method(req, bulgogi::http::verb::head, res)) return;
-    res.result(bulgogi::http::status::ok);
-    res.set(bulgogi::http::field::content_type, "text/plain");
-    res.content_length(0);
-}
+```json
+{ "id": 1 }
 ```
 
 ---
 
-## 🧰 `bulgogi` Utilities
+## 📍 `/graph/exists?id=<id>`
 
-The `bulgogi` namespace wraps essential functionality from Boost.Beast.
+* **Method:** `GET`
+* **Query Parameter:** `id`
 
-### 🔎 Types
+**Example:**
 
-```c++
-using bulgogi::Request;   // HTTP request (string body)
-using bulgogi::Response;  // HTTP response
+```bash
+curl -X GET "http://localhost:8080/graph/exists?id=1"
 ```
 
-### ✔️ Method Check
+**Response:**
 
-```c++
-bool bulgogi::check_method(const Request& req, http::verb expected, Response& res);
-```
-
-Returns `false` and responds with `405` JSON if mismatched.
-
-### 📤 Response Utilities
-
-```c++
-bulgogi::set_json(res, {{"ok", true}});
-bulgogi::set_text(res, "hello");
-bulgogi::set_html(res, "<h1>Hi</h1>");
-bulgogi::set_binary(res, raw_data, "dump.bin");
-```
-
-### 🌐 CORS & Redirect
-
-```c++
-bulgogi::apply_cors(res);                          // Adds Access-Control-* headers
-bulgogi::set_redirect(res, "/home", 302);          // Redirects with Location
-```
-
-### 🔍 Request Helpers
-
-```c++
-auto json = bulgogi::get_json_obj(req);            // Parses body to boost::json::object
-auto name = bulgogi::get_query_param(req, "q");    // Extracts ?q= from URL
+```json
+{ "exists": true }
 ```
 
 ---
 
-### ⚙️ `views.cpp` Custom Hooks
+## 📍 `/graph/add-edge`
 
-You may optionally implement the following functions in `views.cpp` to add global logic:
+* **Method:** `POST`
+* **Body:** `application/json`
 
-```c++
-namespace views {
-    void init();   // Called once during startup
-    void atexit(); // Called once on shutdown
-    void check_head(const bulgogi::Request& req); // Called before CORS headers are applied
+```json
+{
+  "id": 1,
+  "u": 0,
+  "v": 1,
+  "weight": 10,
+  "bi": true
 }
 ```
 
-#### 🔸 `void views::init()`
+**Example:**
 
-```c++
-void views::init() {
-    /// Todo: Add initialization code if needed (e.g. DB connections, logging setup)
+```bash
+curl -X POST http://localhost:8080/graph/add-edge \
+  -H "Content-Type: application/json" \
+  -d '{"id":1, "u":0, "v":1, "weight":10, "bi":true}'
+```
+
+---
+
+## 📍 `/graph/batch-edges`
+
+* **Method:** `POST`
+* **Body:** `application/json`
+
+```json
+{
+  "id": 1,
+  "bi": false,
+  "lines": [
+    { "u": 0, "v": 2, "weight": 3 },
+    { "u": 1, "v": 2, "weight": 5 }
+  ]
 }
 ```
 
-Called **once during application startup**, before any routes are registered.
+**Example:**
 
----
-
-#### 🔸 `void views::atexit()`
-
-```c++
-void views::atexit() {
-    /// Todo: Add cleanup code if needed (e.g. closing resources)
-}
+```bash
+curl -X POST http://localhost:8080/graph/batch-edges \
+  -H "Content-Type: application/json" \
+  -d '{"id":1,"bi":false,"lines":[{"u":0,"v":2,"weight":3},{"u":1,"v":2,"weight":5}]}'
 ```
 
-Called **once at shutdown**, before exiting the application.
-
 ---
 
-#### 🔸 `void views::check_head(const bulgogi::Request& req)`
+## 📍 `/graph/degree?id=<id>&node=<node>&directed=1`
 
-```c++
-void views::check_head([[maybe_unused]] const bulgogi::Request& req) {
-    /// Todo: Implement global CORS/token validation if needed
-    // Example: throw std::runtime_error("Unauthorized") if missing Authorization
-}
+* **Method:** `GET`
+* **Query Parameters:** `id`, `node`, `directed`
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/degree?id=1&node=0&directed=1"
 ```
 
-Called automatically in `bulgogi::apply_cors()`.
+**Response:**
 
-* Throw an exception here to **block unauthorized requests**.
-* The framework will catch it and return a `401 Unauthorized` response automatically.
-
----
-
-> ✅ These are **optional**. Empty implementations are valid.
+```json
+{ "in": 2, "out": 3 }
+```
 
 ---
 
-### 📥 Download Support
+## 📍 `/graph/degree_stats?id=<id>&directed=1`
 
-Download text as a file with content-type:
+* **Method:** `GET`
+* **Query Parameters:** `id`, `directed`
 
-```c++
-namespace download_types {
-    constexpr jh::pod::array<char, 32> CSV = {"csv"};
-}
-using download_csv = bulgogi::set_download<download_types::CSV>;
+**Example:**
 
-REGISTER_VIEW(download_data) {
-    std::string csv = "name,score\nAlice,90\nBob,88\n";
-    download_csv::apply(res, csv, "result.csv");
+```bash
+curl -X GET "http://localhost:8080/graph/degree_stats?id=1&directed=1"
+```
+
+**Response:**
+
+```json
+{
+  "min": 0,
+  "max": 6,
+  "density": 0.14,
+  "avg": 2.3
 }
 ```
 
 ---
 
-### ⚠️ Runtime Error Handling
+## 📍 `/graph/isolated_nodes?id=<id>&directed=0`
 
-By default, route execution in `main` is wrapped with an exception catcher:
+* **Method:** `GET`
+* **Query Parameters:** `id`, `directed`
 
-```c++
-try {
-    it->second(req, hres);
-} catch (const std::exception &e) {
-#ifndef NDEBUG
-    bulgogi::set_json(hres, {{"error", e.what()}}, 400); // Debug: treat as client-side issue
-#else
-    bulgogi::set_json(hres, {{"error", "Internal Server Error"}}, 500); // Release: production-safe
-#endif
-}
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/isolated_nodes?id=1&directed=0"
 ```
 
-#### Implications:
+**Response:**
 
-* In **Debug mode**, unhandled exceptions return `400` with the error message (helps during dev).
-* In **Release mode**, the same code returns `500` with a generic message (avoids leaking internals).
-
----
-
-### ✅ Best Practices
-
-* **Always catch expected exceptions inside your handler** to generate controlled responses.
-
-  ```c++
-  REGISTER_VIEW(do_something) {
-      try {
-        // risky operation
-      } catch (const std::runtime_error& err) {
-          // You can build a custom message instead of exposing err.what()
-          std::string err_str = std::string("Failed to process item: ") + std::to_string(item_id);
-          bulgogi::set_json(res, {{"error", err_str}}, 400);
-          return;
-      }
-  ```
-
-* **Never deploy with `NDEBUG` undefined** — Debug mode reveals internal logic and stack traces.
-
-* Treat `500` as a **last-resort, severe server fault**. Don't rely on global `catch` to handle logic errors.
-
----
-
-📌 You are responsible for graceful handling in production.
-This framework is intentionally minimal and avoids runtime safety layers.
-
----
-
-## 📦 `jh::pod` Introduction
-
-`jh::pod` is a modern C++20 system for defining and working with **plain old data** (POD) safely and portably.
-
-### 💡 Why It Matters
-
-| Advantage                   | Benefit                       |
-|-----------------------------|-------------------------------|
-| Trivial layout              | Zero-cost copying             |
-| No constructors/destructors | Works with `memcpy`, `mmap`   |
-| Fixed-size layout           | Cross-platform deterministic  |
-| Type-safe utilities         | Structs, pairs, arrays, flags |
-
----
-
-### 🧱 Defining POD
-
-```c++
-// Only pod-like attributes are allowed, otherwise compile error
-JH_POD_STRUCT(User,
-    uint32_t id;
-    jh::pod::array<char, 16> name; // wrapper for char[16], better locality than std::string
-);
-// Only attributes and a default operator==() are generated
-```
-
-Use `JH_ASSERT_POD_LIKE(Type)` to validate third-party types.
-
----
-
-### 🔧 Included Types
-
-* `pod::pair<T1, T2>` a pod version of `std::pair`
-* `pod::optional<T>`  a pod version of `std::optional`
-* `pod::array<T, N>`  a wrapper for `T[N]` with STL-like interface
-* `pod::bitflags<N>`  a container for bitwise flags
-* `pod::bytes_view`   a view of raw bytes, offers `clone<T>()` for copying and `hash()` for hashing
-* `pod::string_view`  a view of string-like data, offers basic string operations
-* `pod::span<T>`      a view of contiguous data, similar to `std::span`
-
----
-
-### 🧪 Example: `bitflags`
-
-```c++
-jh::pod::bitflags<32> flags{};
-flags.set(4);
-if (flags.has(4)) { /* logic */ }
+```json
+{ "nodes": [3, 5] }
 ```
 
 ---
 
-### 📤 Memory View & Cloning
+## 📍 `/graph/count_triangles?id=<id>&directed=1`
 
-```c++
-struct Packet { uint16_t id; uint8_t code; };
-JH_ASSERT_POD_LIKE(Packet);
+* **Method:** `GET`
+* **Query Parameters:** `id`, `directed`
 
-Packet p{10, 2};
-auto view = jh::pod::bytes_view::from(p);
-Packet copy = view.clone<Packet>(); // clone can only be applied to strict POD types
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/count_triangles?id=1&directed=1"
 ```
 
-Also supports hashing, range access, and structured equality.
+**Response:**
+
+```json
+{ "count": 8 }
+```
 
 ---
 
-### ✅ STL Compatibility
+## 📍 `/graph/shortest_path?id=<id>&start=<node>&weighed=1`
 
-All `jh::pod` types are compatible with `std::vector`, `std::unordered_map`, and Beast buffers.
-You get `memcpy` speed + full type safety.
+* **Method:** `GET`
+* **Query Parameters:** `id`, `start`, `weighed`
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/shortest_path?id=1&start=0&weighed=1"
+```
+
+**Response:**
+
+```json
+{ "path": [0, 2, 5, 7] }
+```
 
 ---
 
-> 🔗 Learn more at [JH Toolkit repo](https://github.com/JeongHan-Bae/jh-toolkit)  
-> 🔗 See [quick_start.md](quick_start.md) to get started  
-> 🔗 See [build.md](../build.md) for CMake and Docker instructions
+## 📍 `/graph/betweenness_centrality?id=<id>&weighed=0`
+
+* **Method:** `GET`
+* **Query Parameters:** `id`, `weighed`
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/betweenness_centrality?id=1&weighed=0"
+```
+
+**Response:**
+
+```json
+{ "centrality": [0.1, 0.3, 0.0, 0.25] }
+```
+
+---
+
+
+
+## 📍 `/graph/get_from?id=<id>&node=<node>`
+
+* **Method:** `GET`
+
+* **Query Parameters:**
+
+    * `id`: Graph ID
+    * `node`: Source node (0-based index)
+
+* **Description:**
+  Returns all nodes that the specified `node` has outgoing edges to — i.e., direct successors in a directed graph.
+
+  This is equivalent to the "out-neighbors" of a node.
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/get_from?id=1&node=2"
+```
+
+**Response:**
+
+```json
+{ "nodes": [3, 4, 7] }
+```
+
+---
+
+## 📍 `/graph/get_to?id=<id>&node=<node>`
+
+* **Method:** `GET`
+
+* **Query Parameters:**
+
+    * `id`: Graph ID
+    * `node`: Target node (0-based index)
+
+* **Description:**
+  Returns all nodes that have edges pointing to the specified `node` — i.e., direct predecessors in a directed graph.
+
+  This is equivalent to the "in-neighbors" of a node.
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/get_to?id=1&node=2"
+```
+
+**Response:**
+
+```json
+{ "nodes": [0, 5] }
+```
+
+---
+
+## 📍 `/graph/get_neighbours?id=<id>&node=<node>&directed=1`
+
+* **Method:** `GET`
+
+* **Query Parameters:**
+
+    * `id`: Graph ID
+    * `node`: Target node (0-based index)
+    * `directed`: Optional; set to `1` (default) for directed graphs or `0` for undirected graphs
+
+* **Description:**
+  Returns the set of **mutual neighbors** of a node.
+
+    * If `directed=1` (default):
+      Only nodes with **both** incoming and outgoing connections to `node` are returned.
+      This is equivalent to the **intersection of `/graph/get_from` and `/graph/get_to`**.
+
+    * If `directed=0`:
+      The server assumes the graph is **undirected** (edges are symmetric), and only checks `node → x` for neighbors.
+      ⚠️ The server **does not enforce or verify symmetry** — clients are responsible for maintaining undirected structure.
+
+**Example:**
+
+```bash
+curl -X GET "http://localhost:8080/graph/get_neighbours?id=1&node=2&directed=1"
+```
+
+**Response:**
+
+```json
+{ "nodes": [3, 4] }
+```
+
+---
+
+### 🧠 Summary Table
+
+| API                     | Meaning                                    | Mode (`directed`)                                                        |
+|-------------------------|--------------------------------------------|--------------------------------------------------------------------------|
+| `/graph/get_from`       | Nodes `node` can reach (`node → x`)        | Directional                                                              |
+| `/graph/get_to`         | Nodes that can reach `node` (`x → node`)   | Directional                                                              |
+| `/graph/get_neighbours` | Nodes where both `node → x` and `x → node` | Directed<br>(intersection of from + to)<br>Or unilateral if `directed=0` |
+
+---
+
+## 📍 `/graph/destroy?id=<id>`
+
+* **Method:** `DELETE`
+* **Query Parameter:** `id`
+
+⚠️ Call this only when you're sure the graph is no longer used.
+
+**Example:**
+
+```bash
+curl -X DELETE "http://localhost:8080/graph/destroy?id=1"
+```
+
+**Response:**
+
+```json
+{ "deleted": true }
+```
+
+---
+
+## 📍 `/graph/list_ids`
+
+* **Method:** `GET`
+* **Description:** List all active graph IDs
+
+**Example:**
+
+```bash
+curl -X GET http://localhost:8080/graph/list_ids
+```
+
+**Response:**
+
+```json
+{ "ids": [1, 2, 3] }
+```
